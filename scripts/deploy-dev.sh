@@ -37,10 +37,10 @@ fi
 echo "📋 Copying JAR file to /opt..."
 cp build/libs/$JAR_FILE /opt/lv3-final-mission/dev/
 
-# /opt에서 애플리케이션 실행
+# /opt에서 애플리케이션 실행 (새로운 세션으로 완전 분리)
 cd /opt/lv3-final-mission/dev
 echo "🚀 Starting dev application: $JAR_FILE"
-java -jar -Dspring.profiles.active=dev $JAR_FILE > dev-app.log 2>&1 & disown
+setsid nohup java -jar -Dspring.profiles.active=dev $JAR_FILE > dev-app.log 2>&1 < /dev/null &
 
 echo "✅ Dev application deployment completed successfully!"
 echo "📍 Location: /opt/lv3-final-mission/dev/"
