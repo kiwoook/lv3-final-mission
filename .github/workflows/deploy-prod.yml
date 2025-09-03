@@ -45,69 +45,10 @@ jobs:
     - name: Build PROD application
       run: ./gradlew buildProd
 
-    - name: Setup /opt directory
+    - name: Execute deployment script
       run: |
-        # /opt 디렉토리 생성
-        sudo mkdir -p /opt/lv3-final-mission/prod
-        sudo chown -R $USER:$USER /opt/lv3-final-mission
-
-    - name: Stop existing prod application
-      run: |
-        PID=$(pgrep -f "lv2-final-mission-0.0.1-SNAPSHOT-prod.jar" || echo "")
-        if [ ! -z "$PID" ]; then
-          echo "🔄 Gracefully stopping production application with PID: $PID"
-          kill -15 $PID
-          sleep 15
-          if kill -0 $PID 2>/dev/null; then
-            echo "⚠️ Forcefully killing production application"
-            kill -9 $PID
-          fi
-          echo "✅ Production application stopped"
-        else
-          echo "ℹ️ No existing production application found"
-        fi
-
-    - name: Start MySQL Database
-      run: |
-        echo "🗄️ Starting MySQL database..."
-        docker compose down || true
-        docker compose up -d
-        echo "✅ MySQL container started"
-
-    - name: Wait for MySQL to be ready
-      run: |
-        echo "⏳ Waiting for MySQL to be ready..."
-        timeout=60
-        while [ $timeout -gt 0 ] && ! docker exec lv3-final-mission-mysql mysqladmin ping -h"localhost" --silent; do
-          echo "⏳ MySQL is not ready yet, waiting... ($timeout seconds left)"
-          sleep 5
-          timeout=$((timeout-5))
-        done
-        if [ $timeout -le 0 ]; then
-          echo "❌ MySQL failed to start within 60 seconds"
-          docker logs lv3-final-mission-mysql
-          exit 1
-        fi
-        echo "✅ MySQL is ready!"
-
-    - name: Deploy production application
-      run: |
-        cd build/libs
-        JAR_FILE="lv2-final-mission-0.0.1-SNAPSHOT-prod.jar"
-        if [ ! -f "$JAR_FILE" ]; then
-          echo "❌ Expected JAR file not found: $JAR_FILE"
-          ls -la
-          exit 1
-        fi
-        
-        # jar 파일을 /opt로 복사
-        cp $JAR_FILE /opt/lv3-final-mission/prod/
-        
-        # /opt에서 애플리케이션 실행 (disown 사용)
-        cd /opt/lv3-final-mission/prod
-        echo "🚀 Starting production application: $JAR_FILE"
-        java -jar -Dspring.profiles.active=prod $JAR_FILE > prod-app.log 2>&1 & disown
-        echo "✅ Production application deployed successfully"
+        chmod +x scripts/deploy-prod.sh
+        ./scripts/deploy-prod.sh
 
     - name: Wait for application startup
       run: |

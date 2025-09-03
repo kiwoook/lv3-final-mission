@@ -45,44 +45,10 @@ jobs:
     - name: Build DEV application
       run: ./gradlew buildDev
 
-    - name: Stop existing dev application
+    - name: Execute deployment script
       run: |
-        PID=$(pgrep -f "lv2-final-mission-0.0.1-SNAPSHOT-dev.jar" || echo "")
-        if [ ! -z "$PID" ]; then
-          echo "🔄 Stopping existing dev application with PID: $PID"
-          kill -15 $PID
-          sleep 10
-          if kill -0 $PID 2>/dev/null; then
-            echo "⚠️ Forcefully killing dev application"
-            kill -9 $PID
-          fi
-          echo "✅ Dev application stopped"
-        else
-          echo "ℹ️ No existing dev application found"
-        fi
-
-    - name: Deploy dev application
-      run: |
-        # /opt 디렉토리 생성
-        sudo mkdir -p /opt/lv3-final-mission/dev
-        sudo chown -R $USER:$USER /opt/lv3-final-mission
-        
-        cd build/libs
-        JAR_FILE="lv2-final-mission-0.0.1-SNAPSHOT-dev.jar"
-        if [ ! -f "$JAR_FILE" ]; then
-          echo "❌ Expected JAR file not found: $JAR_FILE"
-          ls -la
-          exit 1
-        fi
-        
-        # jar 파일을 /opt로 복사
-        cp $JAR_FILE /opt/lv3-final-mission/dev/
-        
-        # /opt에서 애플리케이션 실행 (disown 사용)
-        cd /opt/lv3-final-mission/dev
-        echo "🚀 Starting dev application: $JAR_FILE"
-        java -jar -Dspring.profiles.active=dev $JAR_FILE > dev-app.log 2>&1 & disown
-        echo "✅ Dev application deployed successfully"
+        chmod +x scripts/deploy-dev.sh
+        ./scripts/deploy-dev.sh
 
     - name: Wait for application startup
       run: |
