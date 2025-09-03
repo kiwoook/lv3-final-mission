@@ -1,0 +1,17 @@
+[Unit]
+Description=LV3 Final Mission Development Application
+After=network.target
+
+[Service]
+Type=simple
+User=runner
+Group=runner
+WorkingDirectory=/opt/lv3-final-mission/dev
+ExecStart=/usr/bin/java -jar -Dspring.profiles.active=dev lv2-final-mission-0.0.1-SNAPSHOT-dev.jar
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/lv3-final-mission/dev/dev-app.log
+StandardError=append:/opt/lv3-final-mission/dev/dev-app.log
+
+[Install]
+WantedBy=multi-user.target

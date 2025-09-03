@@ -53,19 +53,8 @@ jobs:
 
     - name: Stop existing prod application
       run: |
-        PID=$(pgrep -f "lv2-final-mission-0.0.1-SNAPSHOT-prod.jar" || echo "")
-        if [ ! -z "$PID" ]; then
-          echo "🔄 Gracefully stopping production application with PID: $PID"
-          kill -15 $PID
-          sleep 15
-          if kill -0 $PID 2>/dev/null; then
-            echo "⚠️ Forcefully killing production application"
-            kill -9 $PID
-          fi
-          echo "✅ Production application stopped"
-        else
-          echo "ℹ️ No existing production application found"
-        fi
+        sudo systemctl stop lv3-final-mission-prod || echo "Service not running or doesn't exist"
+        echo "✅ Production application service stopped"
 
     - name: Start MySQL Database
       run: |
@@ -103,11 +92,14 @@ jobs:
         # jar 파일을 /opt로 복사
         cp $JAR_FILE /opt/lv3-final-mission/prod/
         
-        # /opt에서 애플리케이션 실행
-        cd /opt/lv3-final-mission/prod
-        echo "🚀 Starting production application: $JAR_FILE"
-        nohup java -jar -Dspring.profiles.active=prod $JAR_FILE > prod-app.log 2>&1 &
-        echo "✅ Production application deployed successfully"
+        # systemd 서비스 파일 설치
+        sudo cp scripts/lv3-final-mission-prod.service /etc/systemd/system/
+        sudo systemctl daemon-reload
+        sudo systemctl enable lv3-final-mission-prod
+        
+        # 서비스 시작
+        sudo systemctl start lv3-final-mission-prod
+        echo "✅ Production application service started"
 
     - name: Wait for application startup
       run: |
@@ -129,7 +121,8 @@ jobs:
         done
         
         echo "❌ Production health check failed after 15 attempts"
-        echo "📋 Checking application logs..."
+        echo "📋 Checking service status and logs..."
+        sudo systemctl status lv3-final-mission-prod --no-pager
         tail -50 /opt/lv3-final-mission/prod/prod-app.log || echo "No logs available"
         exit 1
 
