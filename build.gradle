@@ -45,3 +45,23 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+task buildDev {
+    doLast {
+        project.ext.profile = 'dev'
+    }
+    finalizedBy 'bootJar'
+}
+
+task buildProd {
+    doLast {
+        project.ext.profile = 'prod'
+    }
+    finalizedBy 'bootJar'
+}
+
+bootJar {
+    if (project.hasProperty('profile')) {
+        archiveClassifier = project.profile
+    }
+}

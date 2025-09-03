@@ -42,16 +42,17 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build application (skip tests - already done in CI)
-      run: ./gradlew build -x test
+    - name: Build PROD application
+      run: ./gradlew buildProd
 
     - name: Backup current application
       run: |
         if [ -f "/tmp/lv2-final-mission-backup.jar" ]; then
           rm /tmp/lv2-final-mission-backup.jar
         fi
-        if [ -f "build/libs/lv2-final-mission-"*".jar" ]; then
-          cp build/libs/lv2-final-mission-*.jar /tmp/lv2-final-mission-backup.jar
+        BACKUP_JAR="lv2-final-mission-0.0.1-SNAPSHOT-prod.jar"
+        if [ -f "build/libs/$BACKUP_JAR" ]; then
+          cp build/libs/$BACKUP_JAR /tmp/lv2-final-mission-backup.jar
           echo "✅ Application backup created"
         fi
 
@@ -97,7 +98,12 @@ jobs:
     - name: Deploy production application
       run: |
         cd build/libs
-        JAR_FILE=$(ls lv2-final-mission-*.jar | grep -v plain)
+        JAR_FILE="lv2-final-mission-0.0.1-SNAPSHOT-prod.jar"
+        if [ ! -f "$JAR_FILE" ]; then
+          echo "❌ Expected JAR file not found: $JAR_FILE"
+          ls -la
+          exit 1
+        fi
         echo "🚀 Starting production application: $JAR_FILE"
         nohup java -jar -Dspring.profiles.active=prod $JAR_FILE > prod-app.log 2>&1 &
         echo "✅ Production application deployed"

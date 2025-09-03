@@ -42,8 +42,8 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build application (skip tests - already done in CI)
-      run: ./gradlew build -x test
+    - name: Build DEV application
+      run: ./gradlew buildDev
 
     - name: Stop existing dev application
       run: |
@@ -64,7 +64,12 @@ jobs:
     - name: Deploy dev application
       run: |
         cd build/libs
-        JAR_FILE=$(ls lv2-final-mission-*.jar | grep -v plain)
+        JAR_FILE="lv2-final-mission-0.0.1-SNAPSHOT-dev.jar"
+        if [ ! -f "$JAR_FILE" ]; then
+          echo "❌ Expected JAR file not found: $JAR_FILE"
+          ls -la
+          exit 1
+        fi
         echo "🚀 Starting dev application: $JAR_FILE"
         nohup java -jar -Dspring.profiles.active=dev $JAR_FILE > dev-app.log 2>&1 &
         echo "✅ Dev application deployed successfully"
