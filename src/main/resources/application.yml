@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: lv2-final-mission
+  jpa:
+    open-in-view: false
+  profiles:
+    active: dev
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+jwt:
+  secret: mysecretkeysadsadsadsacxzcxzvdfeqrwqe43214rsacxzcxzcxzcsadqewrqwrs
+  expiration: 3600000 # 1 hour in milliseconds
+
+holiday-api:
+  service-key: sJ+Lz9TtILnR3+qcTUp+uGxm2QJiToGjZPFUv027hv61eVXQpnLjPINKXAfU+3JdtNcW/GrfjMUieJTCtLiJJg==

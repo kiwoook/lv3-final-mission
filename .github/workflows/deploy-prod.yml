@@ -1,0 +1,166 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ prod ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+    
+  deploy:
+    runs-on: self-hosted
+    environment: production
+    needs: test
+    if: ${{ needs.test.result == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build application (skip tests - already done in CI)
+      run: ./gradlew build -x test
+
+    - name: Backup current application
+      run: |
+        if [ -f "/tmp/lv2-final-mission-backup.jar" ]; then
+          rm /tmp/lv2-final-mission-backup.jar
+        fi
+        if [ -f "build/libs/lv2-final-mission-"*".jar" ]; then
+          cp build/libs/lv2-final-mission-*.jar /tmp/lv2-final-mission-backup.jar
+          echo "✅ Application backup created"
+        fi
+
+    - name: Stop existing prod application
+      run: |
+        PID=$(pgrep -f "spring.profiles.active=prod" || echo "")
+        if [ ! -z "$PID" ]; then
+          echo "🔄 Gracefully stopping production application with PID: $PID"
+          kill -15 $PID
+          sleep 15
+          if kill -0 $PID 2>/dev/null; then
+            echo "⚠️ Forcefully killing production application"
+            kill -9 $PID
+          fi
+          echo "✅ Production application stopped"
+        else
+          echo "ℹ️ No existing production application found"
+        fi
+
+    - name: Start MySQL Database
+      run: |
+        echo "🗄️ Starting MySQL database..."
+        docker compose down || true
+        docker compose up -d
+        echo "✅ MySQL container started"
+
+    - name: Wait for MySQL to be ready
+      run: |
+        echo "⏳ Waiting for MySQL to be ready..."
+        timeout=60
+        while [ $timeout -gt 0 ] && ! docker exec lv2-final-mission-mysql mysqladmin ping -h"localhost" --silent; do
+          echo "⏳ MySQL is not ready yet, waiting... ($timeout seconds left)"
+          sleep 5
+          timeout=$((timeout-5))
+        done
+        if [ $timeout -le 0 ]; then
+          echo "❌ MySQL failed to start within 60 seconds"
+          docker logs lv2-final-mission-mysql
+          exit 1
+        fi
+        echo "✅ MySQL is ready!"
+
+    - name: Deploy production application
+      run: |
+        cd build/libs
+        JAR_FILE=$(ls lv2-final-mission-*.jar | grep -v plain)
+        echo "🚀 Starting production application: $JAR_FILE"
+        nohup java -jar -Dspring.profiles.active=prod $JAR_FILE > prod-app.log 2>&1 &
+        echo "✅ Production application deployed"
+
+    - name: Wait for application startup
+      run: |
+        echo "⏳ Waiting for production application to start..."
+        sleep 20
+
+    - name: Health check with rollback
+      run: |
+        echo "🔍 Starting health check for production environment..."
+        for i in {1..15}; do
+          if curl -f http://localhost:8080/actuator/health; then
+            echo "✅ Production health check passed!"
+            echo "🌐 Application available at: http://localhost:8080"
+            exit 0
+          else
+            echo "⏳ Health check attempt $i/15 failed, retrying in 5 seconds..."
+            sleep 5
+          fi
+        done
+        
+        echo "❌ Production health check failed after 15 attempts"
+        echo "🔄 Initiating rollback procedure..."
+        
+        # Stop failed application
+        PID=$(pgrep -f "spring.profiles.active=prod" || echo "")
+        if [ ! -z "$PID" ]; then
+          kill -9 $PID
+        fi
+        
+        # Check if backup exists for rollback
+        if [ -f "/tmp/lv2-final-mission-backup.jar" ]; then
+          echo "📦 Starting rollback with previous version..."
+          nohup java -jar -Dspring.profiles.active=prod /tmp/lv2-final-mission-backup.jar > rollback-app.log 2>&1 &
+          sleep 15
+          if curl -f http://localhost:8080/actuator/health; then
+            echo "✅ Rollback successful"
+          else
+            echo "❌ Rollback also failed"
+          fi
+        fi
+        
+        echo "📋 Checking application logs..."
+        tail -50 build/libs/prod-app.log || echo "No logs available"
+        exit 1
+
+    - name: Deployment notification
+      if: success()
+      run: |
+        echo "🎉 Production deployment completed successfully!"
+        echo "📊 Environment: Production" 
+        echo "🌐 URL: http://localhost:8080"
+        echo "🔧 Profile: prod"
+        echo "🗄️ Database: MySQL"
+        echo "⚡ Status: Live"
+
+    - name: Cleanup
+      if: always()
+      run: |
+        echo "🧹 Cleaning up temporary files..."
+        # Keep only last 3 builds
+        cd build/libs
+        ls -t lv2-final-mission-*.jar | tail -n +4 | xargs rm -f || true
+        echo "✅ Cleanup completed"
