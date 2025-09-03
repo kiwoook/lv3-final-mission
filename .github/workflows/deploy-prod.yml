@@ -82,14 +82,14 @@ jobs:
       run: |
         echo "⏳ Waiting for MySQL to be ready..."
         timeout=60
-        while [ $timeout -gt 0 ] && ! docker exec lv2-final-mission-mysql mysqladmin ping -h"localhost" --silent; do
+        while [ $timeout -gt 0 ] && ! docker exec lv3-final-mission-mysql mysqladmin ping -h"localhost" --silent; do
           echo "⏳ MySQL is not ready yet, waiting... ($timeout seconds left)"
           sleep 5
           timeout=$((timeout-5))
         done
         if [ $timeout -le 0 ]; then
           echo "❌ MySQL failed to start within 60 seconds"
-          docker logs lv2-final-mission-mysql
+          docker logs lv3-final-mission-mysql
           exit 1
         fi
         echo "✅ MySQL is ready!"
