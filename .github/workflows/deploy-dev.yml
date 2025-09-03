@@ -68,7 +68,7 @@ jobs:
         cp $JAR_FILE /opt/lv3-final-mission/dev/
         
         # systemd 서비스 파일 설치
-        sudo cp scripts/lv3-final-mission-dev.service /etc/systemd/system/
+        sudo cp $GITHUB_WORKSPACE/scripts/lv3-final-mission-dev.service /etc/systemd/system/
         sudo systemctl daemon-reload
         sudo systemctl enable lv3-final-mission-dev
         
