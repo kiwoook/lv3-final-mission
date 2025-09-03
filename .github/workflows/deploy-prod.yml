@@ -45,20 +45,15 @@ jobs:
     - name: Build PROD application
       run: ./gradlew buildProd
 
-    - name: Backup current application
+    - name: Setup /opt directory
       run: |
-        if [ -f "/tmp/lv2-final-mission-backup.jar" ]; then
-          rm /tmp/lv2-final-mission-backup.jar
-        fi
-        BACKUP_JAR="lv2-final-mission-0.0.1-SNAPSHOT-prod.jar"
-        if [ -f "build/libs/$BACKUP_JAR" ]; then
-          cp build/libs/$BACKUP_JAR /tmp/lv2-final-mission-backup.jar
-          echo "✅ Application backup created"
-        fi
+        # /opt 디렉토리 생성
+        sudo mkdir -p /opt/lv3-final-mission/prod
+        sudo chown -R $USER:$USER /opt/lv3-final-mission
 
     - name: Stop existing prod application
       run: |
-        PID=$(pgrep -f "spring.profiles.active=prod" || echo "")
+        PID=$(pgrep -f "lv2-final-mission-0.0.1-SNAPSHOT-prod.jar" || echo "")
         if [ ! -z "$PID" ]; then
           echo "🔄 Gracefully stopping production application with PID: $PID"
           kill -15 $PID
@@ -104,9 +99,15 @@ jobs:
           ls -la
           exit 1
         fi
+        
+        # jar 파일을 /opt로 복사
+        cp $JAR_FILE /opt/lv3-final-mission/prod/
+        
+        # /opt에서 애플리케이션 실행
+        cd /opt/lv3-final-mission/prod
         echo "🚀 Starting production application: $JAR_FILE"
         nohup java -jar -Dspring.profiles.active=prod $JAR_FILE > prod-app.log 2>&1 &
-        echo "✅ Production application deployed"
+        echo "✅ Production application deployed successfully"
 
     - name: Wait for application startup
       run: |
@@ -128,28 +129,8 @@ jobs:
         done
         
         echo "❌ Production health check failed after 15 attempts"
-        echo "🔄 Initiating rollback procedure..."
-        
-        # Stop failed application
-        PID=$(pgrep -f "spring.profiles.active=prod" || echo "")
-        if [ ! -z "$PID" ]; then
-          kill -9 $PID
-        fi
-        
-        # Check if backup exists for rollback
-        if [ -f "/tmp/lv2-final-mission-backup.jar" ]; then
-          echo "📦 Starting rollback with previous version..."
-          nohup java -jar -Dspring.profiles.active=prod /tmp/lv2-final-mission-backup.jar > rollback-app.log 2>&1 &
-          sleep 15
-          if curl -f http://localhost:8080/actuator/health; then
-            echo "✅ Rollback successful"
-          else
-            echo "❌ Rollback also failed"
-          fi
-        fi
-        
         echo "📋 Checking application logs..."
-        tail -50 build/libs/prod-app.log || echo "No logs available"
+        tail -50 /opt/lv3-final-mission/prod/prod-app.log || echo "No logs available"
         exit 1
 
     - name: Deployment notification
@@ -162,11 +143,3 @@ jobs:
         echo "🗄️ Database: MySQL"
         echo "⚡ Status: Live"
 
-    - name: Cleanup
-      if: always()
-      run: |
-        echo "🧹 Cleaning up temporary files..."
-        # Keep only last 3 builds
-        cd build/libs
-        ls -t lv2-final-mission-*.jar | tail -n +4 | xargs rm -f || true
-        echo "✅ Cleanup completed"

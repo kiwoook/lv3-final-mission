@@ -47,7 +47,7 @@ jobs:
 
     - name: Stop existing dev application
       run: |
-        PID=$(pgrep -f "spring.profiles.active=dev" || echo "")
+        PID=$(pgrep -f "lv2-final-mission-0.0.1-SNAPSHOT-dev.jar" || echo "")
         if [ ! -z "$PID" ]; then
           echo "🔄 Stopping existing dev application with PID: $PID"
           kill -15 $PID
@@ -63,6 +63,10 @@ jobs:
 
     - name: Deploy dev application
       run: |
+        # /opt 디렉토리 생성
+        sudo mkdir -p /opt/lv3-final-mission/dev
+        sudo chown -R $USER:$USER /opt/lv3-final-mission
+        
         cd build/libs
         JAR_FILE="lv2-final-mission-0.0.1-SNAPSHOT-dev.jar"
         if [ ! -f "$JAR_FILE" ]; then
@@ -70,6 +74,12 @@ jobs:
           ls -la
           exit 1
         fi
+        
+        # jar 파일을 /opt로 복사
+        cp $JAR_FILE /opt/lv3-final-mission/dev/
+        
+        # /opt에서 애플리케이션 실행
+        cd /opt/lv3-final-mission/dev
         echo "🚀 Starting dev application: $JAR_FILE"
         nohup java -jar -Dspring.profiles.active=dev $JAR_FILE > dev-app.log 2>&1 &
         echo "✅ Dev application deployed successfully"
@@ -94,7 +104,7 @@ jobs:
         done
         echo "❌ Dev health check failed after 12 attempts"
         echo "📋 Checking application logs..."
-        tail -50 build/libs/dev-app.log || echo "No logs available"
+        tail -50 /opt/lv3-final-mission/dev/dev-app.log || echo "No logs available"
         exit 1
 
     - name: Deployment notification
