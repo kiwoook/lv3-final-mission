@@ -47,8 +47,19 @@ jobs:
 
     - name: Stop existing dev application
       run: |
-        sudo systemctl stop lv3-final-mission-dev || echo "Service not running or doesn't exist"
-        echo "✅ Dev application service stopped"
+        PID=$(pgrep -f "lv2-final-mission-0.0.1-SNAPSHOT-dev.jar" || echo "")
+        if [ ! -z "$PID" ]; then
+          echo "🔄 Stopping existing dev application with PID: $PID"
+          kill -15 $PID
+          sleep 10
+          if kill -0 $PID 2>/dev/null; then
+            echo "⚠️ Forcefully killing dev application"
+            kill -9 $PID
+          fi
+          echo "✅ Dev application stopped"
+        else
+          echo "ℹ️ No existing dev application found"
+        fi
 
     - name: Deploy dev application
       run: |
@@ -67,14 +78,11 @@ jobs:
         # jar 파일을 /opt로 복사
         cp $JAR_FILE /opt/lv3-final-mission/dev/
         
-        # systemd 서비스 파일 설치
-        sudo cp $GITHUB_WORKSPACE/scripts/lv3-final-mission-dev.service /etc/systemd/system/
-        sudo systemctl daemon-reload
-        sudo systemctl enable lv3-final-mission-dev
-        
-        # 서비스 시작
-        sudo systemctl start lv3-final-mission-dev
-        echo "✅ Dev application service started"
+        # /opt에서 애플리케이션 실행 (disown 사용)
+        cd /opt/lv3-final-mission/dev
+        echo "🚀 Starting dev application: $JAR_FILE"
+        java -jar -Dspring.profiles.active=dev $JAR_FILE > dev-app.log 2>&1 & disown
+        echo "✅ Dev application deployed successfully"
 
     - name: Wait for application startup
       run: |
@@ -95,8 +103,7 @@ jobs:
           fi
         done
         echo "❌ Dev health check failed after 12 attempts"
-        echo "📋 Checking service status and logs..."
-        sudo systemctl status lv3-final-mission-dev --no-pager
+        echo "📋 Checking application logs..."
         tail -50 /opt/lv3-final-mission/dev/dev-app.log || echo "No logs available"
         exit 1
 
