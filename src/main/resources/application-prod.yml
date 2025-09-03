@@ -11,6 +11,6 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:33061/lv2_final_mission?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8
+    url: jdbc:mysql://localhost:33061/lv3_final_mission?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8
     username: app_user
     password: apppassword
